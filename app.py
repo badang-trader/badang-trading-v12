@@ -38,7 +38,7 @@ def candles(symbol,gran):
     minutes={'5m':5,'15m':15,'1H':60,'4H':240,'1D':1440}[gran]
     now=int(time.time()*1000)
     rows=[r for r in rows if int(r[0])+minutes*60000<=now]
-    if len(rows)<205: raise ValueError('확정봉 데이터 부족')
+    if len(rows)<205: raise ValueError(f'{gran} 확정봉 부족: {len(rows)}개 / 최소 205개')
     return rows
 def analyze(symbol,gran):
     rows=candles(symbol,gran); c=[float(x[4]) for x in rows]; h=[float(x[2]) for x in rows]; l=[float(x[3]) for x in rows]; v=[float(x[5]) for x in rows]
