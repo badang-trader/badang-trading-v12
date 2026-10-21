@@ -116,7 +116,7 @@ def analyze(symbol,gran):
     risk=abs(price-stop) if stop is not None else 0
     target=(price+2*risk if direction=='LONG' else price-2*risk if direction=='SHORT' else None)
     if risk<=0 or (target is not None and target<=0): direction='WAIT';stop=None;target=None
-    return {'symbol':symbol,'timeframe':gran,'price':price,'rsi':round(rs[-1],1),'volume_ratio':round(ratio,2),'divergence':div,'trend':'UP' if e20[-1]>e50[-1]>e200[-1] else 'DOWN' if e20[-1]<e50[-1]<e200[-1] else 'MIXED','breakout':'UP' if br_up else 'DOWN' if br_down else 'NONE','fake_breakout':fake_up or fake_down,'direction':direction,'stop':stop,'target':target,'support':prev_lo,'resistance':prev_hi,'last_closed':int(rows[-1][0]),'atr':atr,'swing_low':min(l[-11:-1]),'swing_high':max(h[-11:-1]),'reason':'확정봉 EMA20/50/200, MACD, RSI, 거래량 및 돌파 검증'}
+    return {'rows':rows,'symbol':symbol,'timeframe':gran,'price':price,'rsi':round(rs[-1],1),'volume_ratio':round(ratio,2),'divergence':div,'trend':'UP' if e20[-1]>e50[-1]>e200[-1] else 'DOWN' if e20[-1]<e50[-1]<e200[-1] else 'MIXED','breakout':'UP' if br_up else 'DOWN' if br_down else 'NONE','fake_breakout':fake_up or fake_down,'direction':direction,'stop':stop,'target':target,'support':prev_lo,'resistance':prev_hi,'last_closed':int(rows[-1][0]),'atr':atr,'swing_low':min(l[-11:-1]),'swing_high':max(h[-11:-1]),'reason':'확정봉 EMA20/50/200, MACD, RSI, 거래량 및 돌파 검증'}
 def symbols(min_turnover):
     data=api('/api/v2/mix/market/tickers',{'productType':'USDT-FUTURES'})
     out=[]
@@ -128,7 +128,7 @@ def symbols(min_turnover):
     return sorted(out,key=lambda z:z[1],reverse=True)
 def flow_analysis(symbol, frame, setup):
     """Candle-based proxy, not true trade-side CVD or net capital flow."""
-    rows=candles(symbol,frame)
+    rows=setup['rows']
     cl=[float(r[4]) for r in rows]; op=[float(r[1]) for r in rows]
     # Bitget candle index 6 is quote currency turnover when available.
     turnover=[float(r[6]) if len(r)>6 else float(r[5])*cl[i] for i,r in enumerate(rows)]
@@ -175,7 +175,10 @@ def scenario(setup,direction,mode):
 def scan_one(sym,mode):
     frames=['5m','15m','1H'] if mode=='scalp' else ['1H','4H','1D']
     lower,setup,higher=[analyze(sym,f) for f in frames]
+    lower.pop('rows', None)
+    higher.pop('rows', None)
     flow=flow_analysis(sym,frames[1],setup)
+    setup.pop('rows', None)
     ls=score_direction(setup,higher['trend'],flow,'LONG',lower)
     ss=score_direction(setup,higher['trend'],flow,'SHORT',lower)
     direction='LONG' if ls>=ss else 'SHORT'
