@@ -4,10 +4,36 @@ from flask import Flask, jsonify, render_template, request
 app=Flask(__name__)
 BASE='https://api.bitget.com'
 S=requests.Session()
+API_LOCK=__import__('threading').Lock()
+LAST_API_CALL=[0.0]
+
 def api(path, params=None):
-    r=S.get(BASE+path,params=params,timeout=12); r.raise_for_status(); j=r.json()
-    if j.get('code')!='00000': raise ValueError(str(j.get('msg','API error')))
-    return j.get('data',[])
+    for attempt in range(5):
+        with API_LOCK:
+            elapsed=time.monotonic()-LAST_API_CALL[0]
+            if elapsed<0.4:
+                time.sleep(0.4-elapsed)
+            LAST_API_CALL[0]=time.monotonic()
+            try:
+                r=S.get(BASE+path,params=params,timeout=15)
+                if r.status_code==429:
+                    retry=True
+                else:
+                    r.raise_for_status()
+                    j=r.json()
+                    if j.get('code')=='00000':
+                        return j.get('data',[])
+                    if str(j.get('code')) in ('429','40015','40017'):
+                        retry=True
+                    else:
+                        raise ValueError(str(j.get('msg','API error')))
+            except requests.exceptions.RequestException:
+                if attempt==4:
+                    raise
+                retry=True
+        if retry and attempt<4:
+            time.sleep(min(2*(attempt+1),8))
+    raise ValueError('Bitget API 요청 제한 또는 일시적 통신 오류')
 def ema(a,n):
     v=a[0]; out=[]; k=2/(n+1)
     for x in a: v=x*k+v*(1-k); out.append(v)
